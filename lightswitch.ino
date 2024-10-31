@@ -10,7 +10,7 @@
 #define SWITCH_PIN 0
 #define REED_PIN 1
 #define RELAY_PIN 2
-#define TIMEOUT 30000
+#define TIMEOUT 120000
 int threshold = 900;
 
 bool lightOn = false;
@@ -62,7 +62,9 @@ void printLocalTime() {
   struct tm* timeinfo;
   time(&rawtime);
   timeinfo = localtime(&rawtime);
+  terminal.print(" ");  
   terminal.print(asctime(timeinfo));
+
 }
 
 void setup(void) {
@@ -135,7 +137,7 @@ void setup(void) {
   terminal.println(F("Ranging started"));
 
   // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  vl53.setTimingBudget(100);
+  vl53.setTimingBudget(50);
   terminal.print(F("Timing budget (ms): "));
  terminal.println(vl53.getTimingBudget());
 
@@ -154,7 +156,9 @@ void loop() {
     if (((distance > 0) && (distance < threshold)) && (lightOn == false)) {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);
-      terminal.println("Triggered by motion");
+      
+      terminal.print("Triggered by motion");
+      printLocalTime();
       terminal.flush();
       triggerTime = millis();
     }
@@ -165,7 +169,9 @@ void loop() {
       lightOn = false;
       debounceTime = millis();
       digitalWrite(RELAY_PIN, LOW);
-      terminal.println("Triggered by switch to turn OFF");
+      
+      terminal.print("Triggered by switch to turn OFF");
+      printLocalTime();
       terminal.flush();
       readyToRead = false;
   }
@@ -173,7 +179,9 @@ void loop() {
   if ((digitalRead(SWITCH_PIN)) && (lightOn == false) && (readyToRead) && (millis() - debounceTime > 100)) {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);
-      terminal.println("Triggered by switch to turn ON");
+     
+      terminal.print("Triggered by switch to turn ON");
+       printLocalTime();
       terminal.flush();
       debounceTime = millis();
       triggerTime = millis();
@@ -186,10 +194,12 @@ void loop() {
 
 
 
-  if (!(digitalRead(REED_PIN)) && (lightOn == false) && (readyToRead) && (!doorLeftOpen) && (millis() - debounceTime > 100)) {
+  if ((digitalRead(REED_PIN)) && (lightOn == false) && (readyToRead) && (!doorLeftOpen) && (millis() - debounceTime > 100)) {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);
-      terminal.println("Triggered by reed switch");
+      
+      terminal.print("Door opened.");
+      printLocalTime();
       terminal.flush();
       debounceTime = millis();
       triggerTime = millis();
@@ -199,20 +209,31 @@ void loop() {
 
   if ((millis() - triggerTime > TIMEOUT) && (lightOn) && (distance > threshold)) {
       lightOn = false;
-      terminal.println("Light timed out");
+      
+      terminal.print("Light timed out");
+      printLocalTime();
       terminal.flush();
       digitalWrite(RELAY_PIN, LOW);
-      if (!(digitalRead(REED_PIN)) {doorLeftOpen = true;}
+      if (!(digitalRead(REED_PIN))) {
+          doorLeftOpen = true;
+          terminal.println("Door left open.");
+          terminal.flush();
+        }
   }
 
-  if ((doorLeftOpen) && (digitalRead(REED_PIN)) {
+  if ((doorLeftOpen) && (digitalRead(REED_PIN))) {
       doorLeftOpen = false;
+     
+          terminal.print("Door finally closed.");
+           printLocalTime();
+          terminal.flush();
   }
 
       if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-      every(1000){
+      every(60000){
       Blynk.virtualWrite(V1, distance);
       Blynk.virtualWrite(V2, WiFi.RSSI());
+      Blynk.virtualWrite(V3, temperatureRead());
       }
 
 
