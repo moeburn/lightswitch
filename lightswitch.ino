@@ -7,11 +7,24 @@
 #include "time.h"
 #include "Adafruit_VL53L1X.h"
 
+//################################
+//||                            ||
+//||      Default settings      ||
+//||                            ||
+//################################
+
 #define SWITCH_PIN 0
 #define REED_PIN 1
 #define RELAY_PIN 2
 int timeout = 120;
 int threshold = 900;
+
+//################################
+//||                            ||
+//||        Declarations        ||
+//||                            ||
+//################################
+
 
 bool lightOn = false;
 bool readyToRead = true;
@@ -27,7 +40,7 @@ const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
 int hours, mins, secs;
-unsigned long triggerTime, debounceTime, switchTime;
+unsigned long triggerTime, debounceTime, switchTime, reconnectTime;
 
 char auth[] = "z5Ja7q52QevSNXIIaUGmsP4pKjS_Nz-_";
 
@@ -39,10 +52,28 @@ WidgetTerminal terminal(V10);
     static uint32_t __every__##interval = millis(); \
     if (millis() - __every__##interval >= interval && (__every__##interval = millis()))
 
+void printLocalTime() {
+  time_t rawtime;
+  struct tm* timeinfo;
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+  terminal.print(" ");  
+  terminal.print(asctime(timeinfo));
+
+}
+
+//################################
+//||                            ||
+//||       Blynk controls       ||
+//||                            ||
+//################################
+
+
 BLYNK_WRITE(V10) {
   if (String("help") == param.asStr()) {
     terminal.println("==List of available commands:==");
     terminal.println("wifi");
+    terminal.println("reset");
     terminal.println("==End of list.==");
   }
   if (String("wifi") == param.asStr()) {
@@ -54,10 +85,13 @@ BLYNK_WRITE(V10) {
     terminal.println(WiFi.RSSI());
     printLocalTime();
   }
+  if (String("reset") == param.asStr()) {
+    terminal.println("Restarting...");
+    terminal.flush();
+    ESP.restart();
+  }
     terminal.flush();
 }
-
-
 
 BLYNK_WRITE(V11)
 {
@@ -95,15 +129,13 @@ BLYNK_WRITE(V14)
   }
 }
 
-void printLocalTime() {
-  time_t rawtime;
-  struct tm* timeinfo;
-  time(&rawtime);
-  timeinfo = localtime(&rawtime);
-  terminal.print(" ");  
-  terminal.print(asctime(timeinfo));
+//################################
+//||                            ||
+//||         MAIN SETUP         ||
+//||   (run this on startup)    ||
+//||                            ||
+//################################
 
-}
 
 void setup(void) {
   pinMode(SWITCH_PIN, INPUT_PULLUP);
@@ -182,60 +214,64 @@ void setup(void) {
   terminal.flush();
 }
 
+//################################
+//||                            ||
+//||         MAIN LOOP          ||
+//||     (run this forever)     ||
+//||                            ||
+//################################
+
+
 void loop() {
 
-  
-
-  if (vl53.dataReady()) {
-    // new measurement for the taking!
-    distance = vl53.distance();
-     Serial.println(distance);
+  if (vl53.dataReady()) { //IF laser sensor is ready to give new reading
+    distance = vl53.distance(); //update the reading
     vl53.clearInterrupt();
-    if (((distance > 0) && (distance < threshold)) && (lightOn == false) && (millis() - switchTime > timeout)) {
+    if (((distance > 0) && (distance < threshold)) && (lightOn == false) && (millis() - switchTime > timeout)) { //if the distance is a real number, less than  the threshold, lights are off, and the switch wasn't recently pressed
       lightOn = true;
-      digitalWrite(RELAY_PIN, HIGH);
-      Blynk.virtualWrite(V14, HIGH);      
-      terminal.print("Triggered by motion");
+      digitalWrite(RELAY_PIN, HIGH); //turn the lights ON
+      Blynk.virtualWrite(V14, HIGH);      //send the same to Blynk
+      terminal.print("Triggered by motion"); //write it on the terminal
       printLocalTime();
       terminal.flush();
-      triggerTime = millis();
+      triggerTime = millis(); //update the time at which this all happened
     }
   }
 
 
-  if ((digitalRead(SWITCH_PIN)) && (lightOn == true) && (readyToRead) && (millis() - debounceTime > 100)) {
+  if ((digitalRead(SWITCH_PIN)) && (lightOn == true) && (readyToRead) && (millis() - debounceTime > 100)) { //if the switch was pressed, the lights are ON, the switch isn't being held, and the switch hasn't bounced
       lightOn = false;
       debounceTime = millis();
       switchTime = debounceTime;
-      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW);  //turn the lights OFF
       Blynk.virtualWrite(V14, LOW);
       terminal.print("Switch turned light OFF");
       printLocalTime();
       terminal.flush();
-      readyToRead = false;
+      readyToRead = false; //the switch is being held 
   }
 
-  if ((digitalRead(SWITCH_PIN)) && (lightOn == false) && (readyToRead) && (millis() - debounceTime > 100)) {
+  if ((digitalRead(SWITCH_PIN)) && (lightOn == false) && (readyToRead) && (millis() - debounceTime > 100)) { //if the switch was pressed, the lights are OFF, and the switch hasn't bounced
       lightOn = true;
-      digitalWrite(RELAY_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);  //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      
       terminal.print("Switch turned light ON");
        printLocalTime();
       terminal.flush();
       debounceTime = millis();
       triggerTime = millis();
-      readyToRead = false;
+      readyToRead = false; //the switch is being held 
   }
 
-  if (!digitalRead(SWITCH_PIN) && (!readyToRead)) {
-    readyToRead = true;
+  if (!digitalRead(SWITCH_PIN) && (!readyToRead)) {  //if the switch has been let go after holding it down
+    readyToRead = true;  //we area ready to read anotehr switch press
   }
 
 
 
-  if ((digitalRead(REED_PIN)) && (lightOn == false) && (readyToRead) && (!doorLeftOpen) && (millis() - debounceTime > 100)) {
+  if ((digitalRead(REED_PIN)) && (lightOn == false) && (readyToRead) && (!doorLeftOpen) && (millis() - debounceTime > 100)) { //if the door is opened, the lights are off, the switch isn't being held, the door hasn't been left open, and the reed switch hasn't bounced
       lightOn = true;
-      digitalWrite(RELAY_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH); //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      
       terminal.print("Door opened.");
       printLocalTime();
@@ -246,31 +282,41 @@ void loop() {
   }
 
 
-  if ((millis() - triggerTime > (timeout * 1000)) && (lightOn) && (distance > threshold)) {
+  if ((millis() - triggerTime > (timeout * 1000)) && (lightOn) && (distance > threshold)) { //if the lights have been on longer than the timeout and nobody is standing in front of the laser sensor
       lightOn = false;
       
       terminal.print("Light timed out");
       printLocalTime();
       terminal.flush();
-      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(RELAY_PIN, LOW); //turn the lights OFF
       Blynk.virtualWrite(V14, LOW);
-      if (!(digitalRead(REED_PIN))) {
-          doorLeftOpen = true;
+      if (!(digitalRead(REED_PIN))) { //if the door is still open
+          doorLeftOpen = true; //the door has been left open
           terminal.println("Door left open.");
           terminal.flush();
         }
   }
 
-  if ((doorLeftOpen) && (digitalRead(REED_PIN))) {
-      doorLeftOpen = false;
+  if ((doorLeftOpen) && (digitalRead(REED_PIN))) {  //if the door has closed after being left open
+      doorLeftOpen = false; //the door has closed
      
           terminal.print("Door finally closed.");
            printLocalTime();
           terminal.flush();
   }
 
-      if (WiFi.status() == WL_CONNECTED) {Blynk.run();}
-      every(60000){
+      if (WiFi.status() == WL_CONNECTED) {Blynk.run();}  //don't do Blynk unless wifi
+      else { //if no wifi, try to reconnect
+        if (millis() - reconnectTime > 30000) {
+              Serial.print(millis());
+              WiFi.disconnect();
+              WiFi.reconnect();
+              reconnectTime = millis();
+        }
+
+      } 
+
+      every(60000){ //update Blynk every minute
       Blynk.virtualWrite(V1, distance);
       Blynk.virtualWrite(V2, WiFi.RSSI());
       Blynk.virtualWrite(V3, temperatureRead());
