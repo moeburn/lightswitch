@@ -129,6 +129,11 @@ BLYNK_WRITE(V14)
   }
 }
 
+BLYNK_CONNECTED() {
+  Blynk.syncVirtual(V11);
+  Blynk.syncVirtual(V12);
+}
+
 //################################
 //||                            ||
 //||         MAIN SETUP         ||
@@ -227,7 +232,7 @@ void loop() {
   if (vl53.dataReady()) { //IF laser sensor is ready to give new reading
     distance = vl53.distance(); //update the reading
     vl53.clearInterrupt();
-    if (((distance > 0) && (distance < threshold)) && (lightOn == false) && (millis() - switchTime > timeout)) { //if the distance is a real number, less than  the threshold, lights are off, and the switch wasn't recently pressed
+    if (((distance > 0) && (distance < threshold)) && (lightOn == false) && (millis() - switchTime > (timeout*1000))) { //if the distance is a real number, less than  the threshold, lights are off, and the switch wasn't recently pressed
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH); //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      //send the same to Blynk
@@ -290,7 +295,7 @@ void loop() {
       terminal.flush();
       digitalWrite(RELAY_PIN, LOW); //turn the lights OFF
       Blynk.virtualWrite(V14, LOW);
-      if (!(digitalRead(REED_PIN))) { //if the door is still open
+      if ((digitalRead(REED_PIN))) { //if the door is still open
           doorLeftOpen = true; //the door has been left open
           terminal.println("Door left open.");
           terminal.flush();
