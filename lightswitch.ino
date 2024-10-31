@@ -10,7 +10,7 @@
 #define SWITCH_PIN 0
 #define REED_PIN 1
 #define RELAY_PIN 2
-#define TIMEOUT 120000
+int timeout = 120;
 int threshold = 900;
 
 bool lightOn = false;
@@ -27,7 +27,7 @@ const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 0;   //Replace with your daylight offset (secs)
 int hours, mins, secs;
-unsigned long triggerTime, debounceTime;
+unsigned long triggerTime, debounceTime, switchTime;
 
 char auth[] = "z5Ja7q52QevSNXIIaUGmsP4pKjS_Nz-_";
 
@@ -55,6 +55,44 @@ BLYNK_WRITE(V10) {
     printLocalTime();
   }
     terminal.flush();
+}
+
+
+
+BLYNK_WRITE(V11)
+{
+   timeout = param.asInt(); // assigning incoming value from pin V1 to a variable
+}
+
+BLYNK_WRITE(V12)
+{
+   threshold = param.asInt(); // assigning incoming value from pin V1 to a variable
+}
+
+BLYNK_WRITE(V14)
+{
+  if ((param.asInt() == 1) && (lightOn == false) && (readyToRead) && (millis() - debounceTime > 100)) {
+      lightOn = true;
+      digitalWrite(RELAY_PIN, HIGH);
+     
+      terminal.print("App turned light ON");
+       printLocalTime();
+      terminal.flush();
+      debounceTime = millis();
+      triggerTime = millis();
+      readyToRead = false;
+  }
+
+  if ((param.asInt() == 0) && (lightOn == true) && (readyToRead) && (millis() - debounceTime > 100)) {
+      lightOn = false;
+      debounceTime = millis();
+      digitalWrite(RELAY_PIN, LOW);
+      
+      terminal.print("App turned light OFF");
+      printLocalTime();
+      terminal.flush();
+      readyToRead = false;
+  }
 }
 
 void printLocalTime() {
@@ -153,10 +191,10 @@ void loop() {
     distance = vl53.distance();
      Serial.println(distance);
     vl53.clearInterrupt();
-    if (((distance > 0) && (distance < threshold)) && (lightOn == false)) {
+    if (((distance > 0) && (distance < threshold)) && (lightOn == false) && (millis() - switchTime > timeout)) {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);
-      
+      Blynk.virtualWrite(V14, HIGH);      
       terminal.print("Triggered by motion");
       printLocalTime();
       terminal.flush();
@@ -168,9 +206,10 @@ void loop() {
   if ((digitalRead(SWITCH_PIN)) && (lightOn == true) && (readyToRead) && (millis() - debounceTime > 100)) {
       lightOn = false;
       debounceTime = millis();
+      switchTime = debounceTime;
       digitalWrite(RELAY_PIN, LOW);
-      
-      terminal.print("Triggered by switch to turn OFF");
+      Blynk.virtualWrite(V14, LOW);
+      terminal.print("Switch turned light OFF");
       printLocalTime();
       terminal.flush();
       readyToRead = false;
@@ -179,8 +218,8 @@ void loop() {
   if ((digitalRead(SWITCH_PIN)) && (lightOn == false) && (readyToRead) && (millis() - debounceTime > 100)) {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);
-     
-      terminal.print("Triggered by switch to turn ON");
+      Blynk.virtualWrite(V14, HIGH);      
+      terminal.print("Switch turned light ON");
        printLocalTime();
       terminal.flush();
       debounceTime = millis();
@@ -197,7 +236,7 @@ void loop() {
   if ((digitalRead(REED_PIN)) && (lightOn == false) && (readyToRead) && (!doorLeftOpen) && (millis() - debounceTime > 100)) {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);
-      
+      Blynk.virtualWrite(V14, HIGH);      
       terminal.print("Door opened.");
       printLocalTime();
       terminal.flush();
@@ -207,13 +246,14 @@ void loop() {
   }
 
 
-  if ((millis() - triggerTime > TIMEOUT) && (lightOn) && (distance > threshold)) {
+  if ((millis() - triggerTime > (timeout * 1000)) && (lightOn) && (distance > threshold)) {
       lightOn = false;
       
       terminal.print("Light timed out");
       printLocalTime();
       terminal.flush();
       digitalWrite(RELAY_PIN, LOW);
+      Blynk.virtualWrite(V14, LOW);
       if (!(digitalRead(REED_PIN))) {
           doorLeftOpen = true;
           terminal.println("Door left open.");
