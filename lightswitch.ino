@@ -302,7 +302,7 @@ void loop() {
         }
   }
 
-  if ((doorLeftOpen) && (digitalRead(REED_PIN))) {  //if the door has closed after being left open
+  if ((doorLeftOpen) && (!digitalRead(REED_PIN))) {  //if the door has closed after being left open
       doorLeftOpen = false; //the door has closed
      
           terminal.print("Door finally closed.");
