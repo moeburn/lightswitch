@@ -232,7 +232,7 @@ void loop() {
   if (vl53.dataReady()) { //IF laser sensor is ready to give new reading
     distance = vl53.distance(); //update the reading
     vl53.clearInterrupt();
-    if (((distance > 0) && (distance < threshold)) && (lightOn == false) && (millis() - switchTime > (timeout*1000))) { //if the distance is a real number, less than  the threshold, lights are off, and the switch wasn't recently pressed
+    if (( (distance < threshold)) && (lightOn == false) && (millis() - switchTime > (timeout*1000))) { //if the distance is a real number, less than  the threshold, lights are off, and the switch wasn't recently pressed
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH); //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      //send the same to Blynk
