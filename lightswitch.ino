@@ -287,7 +287,7 @@ void loop() {
   }
 
 
-  if ((millis() - triggerTime > (timeout * 1000)) && (lightOn) && (distance > threshold)) { //if the lights have been on longer than the timeout and nobody is standing in front of the laser sensor
+  if ((millis() - triggerTime > (timeout * 1000)) && (lightOn) && (!digitalRead(REED_PIN)) && (distance > threshold)) { //if the lights have been on longer than the timeout and nobody is standing in front of the laser sensor
       lightOn = false;
       
       terminal.print("Light timed out");
@@ -295,20 +295,11 @@ void loop() {
       terminal.flush();
       digitalWrite(RELAY_PIN, LOW); //turn the lights OFF
       Blynk.virtualWrite(V14, LOW);
-      if ((digitalRead(REED_PIN))) { //if the door is still open
-          doorLeftOpen = true; //the door has been left open
-          terminal.println("Door left open.");
-          terminal.flush();
-        }
+
   }
 
-  if ((doorLeftOpen) && (!digitalRead(REED_PIN))) {  //if the door has closed after being left open
-      doorLeftOpen = false; //the door has closed
-     
-          terminal.print("Door finally closed.");
-           printLocalTime();
-          terminal.flush();
-  }
+
+
 
       if (WiFi.status() == WL_CONNECTED) {Blynk.run();}  //don't do Blynk unless wifi
       else { //if no wifi, try to reconnect
