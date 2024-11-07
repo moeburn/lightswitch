@@ -195,9 +195,9 @@ void setup(void) {
 
   Wire.begin();
   if (! vl53.begin(0x29, &Wire)) {
-    //terminal.print(F("Error on init of VL sensor: "));
-    //terminal.println(vl53.vl_status);
-    while (1)       delay(10);
+    terminal.print(F("Error on init of VL sensor: "));
+    terminal.println(vl53.vl_status);
+   // while (1)       delay(10);
   }
   terminal.println(F("VL53L1X sensor OK!"));
 
@@ -207,16 +207,20 @@ void setup(void) {
   if (! vl53.startRanging()) {
     terminal.print(F("Couldn't start ranging: "));
     terminal.println(vl53.vl_status);
-    while (1)       delay(10);
+    //while (1)       delay(10);
   }
   terminal.println(F("Ranging started"));
 
   // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  vl53.setTimingBudget(50);
+  vl53.setTimingBudget(20);
   terminal.print(F("Timing budget (ms): "));
  terminal.println(vl53.getTimingBudget());
 
   terminal.flush();
+  distance = vl53.distance(); 
+        Blynk.virtualWrite(V1, distance);
+      Blynk.virtualWrite(V2, WiFi.RSSI());
+      Blynk.virtualWrite(V3, temperatureRead());
 }
 
 //################################
@@ -236,6 +240,7 @@ void loop() {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH); //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      //send the same to Blynk
+      Blynk.virtualWrite(V1, distance);
       terminal.print("Triggered by motion"); //write it on the terminal
       printLocalTime();
       terminal.flush();
@@ -250,6 +255,7 @@ void loop() {
       switchTime = debounceTime;
       digitalWrite(RELAY_PIN, LOW);  //turn the lights OFF
       Blynk.virtualWrite(V14, LOW);
+      Blynk.virtualWrite(V1, distance);
       terminal.print("Switch turned light OFF");
       printLocalTime();
       terminal.flush();
@@ -260,6 +266,7 @@ void loop() {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH);  //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      
+      Blynk.virtualWrite(V1, distance);
       terminal.print("Switch turned light ON");
        printLocalTime();
       terminal.flush();
@@ -278,6 +285,7 @@ void loop() {
       lightOn = true;
       digitalWrite(RELAY_PIN, HIGH); //turn the lights ON
       Blynk.virtualWrite(V14, HIGH);      
+      Blynk.virtualWrite(V1, distance);
       terminal.print("Door opened.");
       printLocalTime();
       terminal.flush();
@@ -295,6 +303,7 @@ void loop() {
       terminal.flush();
       digitalWrite(RELAY_PIN, LOW); //turn the lights OFF
       Blynk.virtualWrite(V14, LOW);
+      Blynk.virtualWrite(V1, distance);
 
   }
 
