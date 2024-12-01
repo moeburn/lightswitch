@@ -74,6 +74,7 @@ BLYNK_WRITE(V10) {
     terminal.println("==List of available commands:==");
     terminal.println("wifi");
     terminal.println("reset");
+    terminal.println("door");
     terminal.println("==End of list.==");
   }
   if (String("wifi") == param.asStr()) {
@@ -89,6 +90,11 @@ BLYNK_WRITE(V10) {
     terminal.println("Restarting...");
     terminal.flush();
     ESP.restart();
+  }
+  if (String("door") == param.asStr()) {
+    terminal.print("Door status is: ");
+    terminal.println(digitalRead(REED_PIN));
+    terminal.flush();
   }
     terminal.flush();
 }
@@ -212,7 +218,7 @@ void setup(void) {
   terminal.println(F("Ranging started"));
 
   // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  vl53.setTimingBudget(20);
+  vl53.setTimingBudget(33);
   terminal.print(F("Timing budget (ms): "));
  terminal.println(vl53.getTimingBudget());
 
